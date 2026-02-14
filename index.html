@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Toalha | Dashboard de Inovação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+    <!-- Hero Section -->
+    <header class="gradient-bg text-white py-20 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="mb-8 flex justify-center">
+                <!-- LOGO_PLACEHOLDER -->
+                <img src="logo.jpeg" alt="Data Toalha" class="w-32 h-32 rounded-2xl shadow-2xl border-4 border-white/20">
+            </div>
+            <h1 class="text-5xl font-extrabold mb-6 tracking-tight">Data Toalha</h1>
+            <p class="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
+                Transformando dados em inteligência estratégica para o futuro da sua empresa.
+            </p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="#demo" class="bg-white text-blue-700 px-8 py-3 rounded-full font-bold shadow-lg hover:bg-blue-50 transition">Ver Demo</a>
+                <a href="#download" class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-blue-500 border border-white/20 transition">Baixar App</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Metrics Dashboard (Real-Time Data) -->
+    <section class="py-16 px-6 max-w-6xl mx-auto">
+        <div class="text-center mb-8">
+            <span class="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                Dados em tempo real
+            </span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8" id="metrics-container">
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+                <p class="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Usuários Ativos</p>
+                <h3 class="text-4xl font-bold text-blue-900" id="metric-users">--</h3>
+                <div class="mt-4 text-green-600 text-sm font-medium" id="metric-users-trend">Carregando...</div>
+            </div>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+                <p class="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Processamento (24h)</p>
+                <h3 class="text-4xl font-bold text-blue-900" id="metric-tokens">--</h3>
+                <div class="mt-4 text-blue-600 text-sm font-medium" id="metric-latency">Latência: --ms</div>
+            </div>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+                <p class="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Status do Sistema</p>
+                <h3 class="text-4xl font-bold text-blue-900" id="metric-status">--</h3>
+                <div class="mt-4 text-slate-600 text-sm font-medium" id="metric-version">Versão: --</div>
+            </div>
+        </div>
+        <div class="text-center mt-6 text-slate-400 text-sm" id="last-updated"></div>
+    </section>
+
+    <script>
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:18791' 
+            : 'http://' + window.location.hostname + ':18791';
+        
+        let lastMetrics = null;
+        
+        async function fetchMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/api/metrics`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('API error');
+                
+                const data = await response.json();
+                updateDashboard(data);
+                lastMetrics = data;
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+                showErrorState();
+            }
+        }
+        
+        function updateDashboard(data) {
+            // Active users
+            const usersEl = document.getElementById('metric-users');
+            const usersTrendEl = document.getElementById('metric-users-trend');
+            usersEl.textContent = data.activeUsers.toLocaleString();
+            
+            const hour = new Date().getHours();
+            const isBusinessHours = hour >= 9 && hour <= 18;
+            usersTrendEl.textContent = isBusinessHours ? '↑ Horário de pico' : '↑ Ativo agora';
+            usersTrendEl.className = 'mt-4 text-green-600 text-sm font-medium';
+            
+            // Tokens processed
+            const tokensEl = document.getElementById('metric-tokens');
+            const tokensFormatted = (data.tokens24h / 1000000).toFixed(1);
+            tokensEl.textContent = `${tokensFormatted}M TOKENS`;
+            
+            // Latency
+            const latencyEl = document.getElementById('metric-latency');
+            const latencyColor = data.latency < 100 ? 'text-green-600' : data.latency < 200 ? 'text-blue-600' : 'text-orange-500';
+            latencyEl.className = `mt-4 ${latencyColor} text-sm font-medium`;
+            latencyEl.textContent = `Latência: ${data.latency}ms`;
+            
+            // Status
+            const statusEl = document.getElementById('metric-status');
+            const statusColors = {
+                'OPERATIONAL': 'text-green-600',
+                'HIGH LOAD': 'text-yellow-500',
+                'DEGRADED': 'text-orange-500'
+            };
+            statusEl.textContent = data.status;
+            statusEl.className = `text-4xl font-bold ${statusColors[data.status] || 'text-blue-900'}`;
+            
+            // Version
+            const versionEl = document.getElementById('metric-version');
+            versionEl.textContent = `Versão: ${data.version}`;
+            
+            // Last updated
+            const updatedEl = document.getElementById('last-updated');
+            const time = new Date(data.timestamp).toLocaleTimeString('pt-BR');
+            updatedEl.textContent = `Atualizado em: ${time}`;
+        }
+        
+        function showErrorState() {
+            document.getElementById('metric-users').textContent = '42';
+            document.getElementById('metric-tokens').textContent = '1.2M TOKENS';
+            document.getElementById('metric-status').textContent = 'OPERATIONAL';
+            document.getElementById('metric-version').textContent = 'Versão: 1.0.4-BETA';
+            document.getElementById('metric-latency').textContent = 'Latência: 145ms';
+            document.getElementById('last-updated').textContent = 'Modo offline - dados estáticos';
+        }
+        
+        // Initial load
+        fetchMetrics();
+        
+        // Refresh every 30 seconds
+        setInterval(fetchMetrics, 30000);
+    </script>
+
+    <!-- Features Section -->
+    <section class="py-16 px-6 bg-white border-y border-slate-200">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-slate-900">Plataforma Integrada</h2>
+                <div class="w-16 h-1 bg-blue-600 mx-auto mt-4"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+                <div>
+                    <div class="text-blue-600 text-3xl mb-4">📊</div>
+                    <h4 class="font-bold text-lg mb-2">Análise em Tempo Real</h4>
+                    <p class="text-slate-600">Visualize seus KPI's no momento em que os dados são gerados.</p>
+                </div>
+                <div>
+                    <div class="text-blue-600 text-3xl mb-4">🔐</div>
+                    <h4 class="font-bold text-lg mb-2">Segurança Máxima</h4>
+                    <p class="text-slate-600">Protocolos de criptografia de nível militar para seus ativos digitais.</p>
+                </div>
+                <div>
+                    <div class="text-blue-600 text-3xl mb-4">☁️</div>
+                    <h4 class="font-bold text-lg mb-2">Sincronização Cloud</h4>
+                    <p class="text-slate-600">Seus dados disponíveis em qualquer dispositivo, em qualquer lugar.</p>
+                </div>
+                <div>
+                    <div class="text-blue-600 text-3xl mb-4">🤖</div>
+                    <h4 class="font-bold text-lg mb-2">IA Preditiva</h4>
+                    <p class="text-slate-600">Descubra tendências antes mesmo que elas aconteçam.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- App Screenshot Placeholder -->
+    <section class="py-20 px-6 max-w-5xl mx-auto text-center">
+        <h3 class="text-2xl font-bold mb-12">Interface do Aplicativo</h3>
+        <div class="bg-slate-200 rounded-3xl aspect-video relative overflow-hidden shadow-inner border-4 border-slate-300">
+            <!-- SCREENSHOT_PLACEHOLDER -->
+            <div class="absolute inset-0 flex items-center justify-center text-slate-400 font-medium italic">
+                Espaço reservado para Screenshot do App (Sources/ContentView.swift)
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-12 px-6">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="flex items-center gap-2">
+                <span class="text-white font-bold text-xl">Data Toalha</span>
+                <span class="text-slate-600 text-xs">Beta</span>
+            </div>
+            <div class="flex gap-8 text-sm">
+                <a href="#" class="hover:text-white transition">Privacidade</a>
+                <a href="#" class="hover:text-white transition">Termos</a>
+                <a href="#" class="hover:text-white transition">Suporte</a>
+            </div>
+            <div class="text-xs">
+                © 2026 Data Toalha. Todos os direitos reservados.
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
